@@ -378,6 +378,7 @@ func (l UserLogic) ChangeUserStatus(c *gin.Context, req interface{}) (data inter
 		return nil, ReqAssertErr
 	}
 	_ = c
+
 	// 校验工作
 	filter := tools.H{"id": r.ID}
 	if !isql.User.Exist(filter) {
@@ -396,14 +397,37 @@ func (l UserLogic) ChangeUserStatus(c *gin.Context, req interface{}) (data inter
 		return nil, tools.NewValidatorError(fmt.Errorf("用户已经是离职状态"))
 	}
 
-	// 获取当前登录用户，只有管理员才能够将用户状态改变
-	// 获取当前登陆用户角色排序最小值（最高等级角色）以及当前用户
-	minSort, _, err := isql.User.GetCurrentUserMinRoleSort(c)
+	// 获取当前登录用户
+	ctxUser, err := isql.User.GetCurrentLoginUser(c)
+	if err != nil {
+		return nil, tools.NewMySqlError(fmt.Errorf("获取当前登陆用户失败"))
+	}
+
+	// 获取当前登录用户角色排序最小值（最高等级角色）
+	currentRoleSortMin, _, err := isql.User.GetCurrentUserMinRoleSort(c)
 	if err != nil {
 		return nil, tools.NewValidatorError(fmt.Errorf("获取当前登陆用户角色排序最小值失败"))
 	}
 
-	if int(minSort) != 1 {
+	// 获取将要操作的用户角色排序最小值
+	reqRoleSortMin, err := isql.User.GetUserMinRoleSortsByIds([]uint{uint(r.ID)})
+	if err != nil || len(reqRoleSortMin) == 0 {
+		return nil, tools.NewValidatorError(fmt.Errorf("根据用户ID获取用户角色排序最小值失败"))
+	}
+	reqRoleSortMinInt := reqRoleSortMin[0]
+
+	// 不能修改自己的状态
+	if int(r.ID) == int(ctxUser.ID) {
+		return nil, tools.NewValidatorError(fmt.Errorf("用户不能修改自己的状态"))
+	}
+
+	// 不能修改比自己角色等级高的用户的状态
+	if currentRoleSortMin >= uint(reqRoleSortMinInt) {
+		return nil, tools.NewValidatorError(fmt.Errorf("用户不能修改比自己角色等级高的用户的状态"))
+	}
+
+	// 只有管理员(含子管理员：角色ID为2)才能更改用户状态
+	if int(currentRoleSortMin) != 1 && int(currentRoleSortMin) != 2 {
 		return nil, tools.NewValidatorError(fmt.Errorf("只有管理员才能更改用户状态"))
 	}
 
@@ -424,6 +448,7 @@ func (l UserLogic) ChangeUserStatus(c *gin.Context, req interface{}) (data inter
 	}
 	return nil, nil
 }
+
 
 // GetUserInfo 获取用户信息
 func (l UserLogic) GetUserInfo(c *gin.Context, req interface{}) (data interface{}, rspError interface{}) {
