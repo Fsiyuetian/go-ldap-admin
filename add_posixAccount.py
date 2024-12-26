@@ -70,26 +70,25 @@ class OpenLdap(object):
         count_success = 0
         count_failed = 0
         for uid in users:
-            if uid == 'RL0093':
-                dn = f'uid={uid},{self.user_ou},{self.dn}'
-                uid_number = self.generate_uid_number(uid)
-                mod_attrs = {
-                    'gidNumber': [(MODIFY_ADD, ['1'])],
-                    'homeDirectory': [(MODIFY_ADD, [f'/home/users/{uid}'])],
-                    'uidNumber': [(MODIFY_ADD, [str(uid_number)])],
-                    'objectClass': [(MODIFY_ADD, ['posixAccount'])]
-                }
-                try:
-                    lg.modify(dn, mod_attrs)
-                    if lg.result['description'] == 'success':
-                        logging.info(f'Successfully added attributes to {dn}')
-                        count_success += 1
-                    else:
-                        logging.error(f'Failed to add attributes to {dn}: {lg.result}')
-                        count_failed += 1
-                except Exception as e:
-                    logging.error(f'Error adding attributes to {dn}: {e}')
+            dn = f'uid={uid},{self.user_ou},{self.dn}'
+            uid_number = self.generate_uid_number(uid)
+            mod_attrs = {
+                'gidNumber': [(MODIFY_ADD, ['1'])],
+                'homeDirectory': [(MODIFY_ADD, [f'/home/users/{uid}'])],
+                'uidNumber': [(MODIFY_ADD, [str(uid_number)])],
+                'objectClass': [(MODIFY_ADD, ['posixAccount'])]
+            }
+            try:
+                lg.modify(dn, mod_attrs)
+                if lg.result['description'] == 'success':
+                    logging.info(f'Successfully added attributes to {dn}')
+                    count_success += 1
+                else:
+                    logging.error(f'Failed to add attributes to {dn}: {lg.result}')
                     count_failed += 1
+            except Exception as e:
+                logging.error(f'Error adding attributes to {dn}: {e}')
+                count_failed += 1
         print(f"Successfully count: {count_success}, Failed count: {count_failed}")
         return True
 
